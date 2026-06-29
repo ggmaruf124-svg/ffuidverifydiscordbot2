@@ -7,25 +7,39 @@ from telethon import TelegramClient, events
 # ================= CONFIGURATION =================
 TELEGRAM_API_ID = 33809887          
 TELEGRAM_API_HASH = "6d1b4c3acabca19425298ec275b0b469"
+
+# রেন্ডারের Environment Variables থেকে মানগুলো নেওয়া হচ্ছে
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")  # নতুন এনভায়রনমেন্ট ভেরিয়েবল
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")  
 
 TARGET_BOT = 'FFPlayerInfoBot' 
 # =================================================
 
 bot = commands.Bot(command_prefix="/", intents=discord.Intents.all())
-
-# বটের মাধ্যমে লগইন করার জন্য সেশন ফাইলের নাম 'bot_session' দেওয়া হলো
 tg_client = TelegramClient('bot_session', TELEGRAM_API_ID, TELEGRAM_API_HASH)
 
 @bot.event
 async def on_ready():
     print(f"✅ Discord Bot is online as {bot.user}")
     
-    # টেলিগ্রাম ক্লায়েন্ট বটের টোকেন দিয়ে স্টার্ট করা হচ্ছে (ওটিপি লাগবে না)
+    # টোকেন সঠিকভাবে রেন্ডার থেকে লোড হয়েছে কিনা তা নিশ্চিত করা
+    if not TG_BOT_TOKEN:
+        print("❌ ERROR: 'TG_BOT_TOKEN' environment variable is missing or empty!")
+        return
+
+    # টেলিগ্রাম ক্লায়েন্ট কানেক্ট করা
     if not tg_client.is_connected():
-        await tg_client.start(bot_token=TG_BOT_TOKEN)
-    print("✅ Telegram Bot Client is connected seamlessly.")
+        await tg_client.connect()
+    
+    # ওটিপি বা ফোন নাম্বার ইনপুট এড়াতে সরাসরি bot.sign_in পদ্ধতি ব্যবহার করা হলো
+    if not await tg_client.is_user_authorized():
+        try:
+            await tg_client.sign_in(bot_token=TG_BOT_TOKEN)
+            print("✅ Telegram Bot Client is authorized and connected seamlessly!")
+        except Exception as e:
+            print(f"❌ Telegram login failed: {e}")
+    else:
+        print("✅ Telegram Bot Client is already authorized.")
 
 @bot.command()
 async def uid(ctx, uid_number: str):
