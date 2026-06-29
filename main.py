@@ -8,20 +8,24 @@ from telethon import TelegramClient, events
 TELEGRAM_API_ID = 33809887          
 TELEGRAM_API_HASH = "6d1b4c3acabca19425298ec275b0b469"
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")  # নতুন এনভায়রনমেন্ট ভেরিয়েবল
 
-# আপনার ফ্রিফায়ার বটের ইউজারনেম এখানে সেট করা হলো
 TARGET_BOT = 'FFPlayerInfoBot' 
 # =================================================
 
 bot = commands.Bot(command_prefix="/", intents=discord.Intents.all())
-tg_client = TelegramClient('session_name', TELEGRAM_API_ID, TELEGRAM_API_HASH)
+
+# বটের মাধ্যমে লগইন করার জন্য সেশন ফাইলের নাম 'bot_session' দেওয়া হলো
+tg_client = TelegramClient('bot_session', TELEGRAM_API_ID, TELEGRAM_API_HASH)
 
 @bot.event
 async def on_ready():
     print(f"✅ Discord Bot is online as {bot.user}")
+    
+    # টেলিগ্রাম ক্লায়েন্ট বটের টোকেন দিয়ে স্টার্ট করা হচ্ছে (ওটিপি লাগবে না)
     if not tg_client.is_connected():
-        await tg_client.start()
-    print("✅ Telegram Client is connected.")
+        await tg_client.start(bot_token=TG_BOT_TOKEN)
+    print("✅ Telegram Bot Client is connected seamlessly.")
 
 @bot.command()
 async def uid(ctx, uid_number: str):
@@ -30,35 +34,29 @@ async def uid(ctx, uid_number: str):
     if not tg_client.is_connected():
         await tg_client.connect()
 
-    # মেসেজগুলো প্রসেস করার মেইন লজিক
     async def process_tg_message(event_msg):
         msg_text = event_msg.text or ""
         
-        # লোডিং মেসেজ হলে ওটা ডিসকর্ডে পাঠাবে না, ইগনোর করবে
         if "Fetching information for" in msg_text:
             return
 
-        # মূল অ্যাকাউন্ট ইনফো থাকলে কোড ব্লকে সুন্দর করে ডিসকর্ডে পাঠাবে
         if "Account Information:" in msg_text:
             await ctx.send(f"```text\n{msg_text}\n```")
             
-        # স্টিকার বা ইমেজ (মিডিয়া) থাকলে ডাউনলোড করে ডিসকর্ডে আপলোড করবে
         elif event_msg.media:
             file_path = await tg_client.download_media(event_msg)
             if file_path:
                 with open(file_path, "rb") as fh:
                     await ctx.send(file=discord.File(fh))
                 try:
-                    os.remove(file_path) # সাময়িক ফাইল ডিলিট করা
+                    os.remove(file_path)
                 except:
                     pass
 
-    # নতুন মেসেজ হ্যান্ডলার
     @tg_client.on(events.NewMessage(chats=TARGET_BOT))
     async def new_msg_handler(event):
         await process_tg_message(event.message)
 
-    # মেসেজ এডিট হ্যান্ডলার (টেলিগ্রাম বট মেসেজ এডিট করলে যাতে ক্যাচ করতে পারে)
     @tg_client.on(events.MessageEdited(chats=TARGET_BOT))
     async def edit_msg_handler(event):
         await process_tg_message(event.message)
@@ -66,14 +64,12 @@ async def uid(ctx, uid_number: str):
     # টেলিগ্রাম বটের কাছে কমান্ড পাঠানো হলো
     await tg_client.send_message(TARGET_BOT, f'/get {uid_number}')
 
-    # ডাটা রিসিভ ও ফরওয়ার্ড করার জন্য ১৫ সেকেন্ড লাইভ অপেক্ষা করবে
+    # ডাটা রিসিভ করার জন্য ১৫ সেকেন্ড অপেক্ষা করবে
     await asyncio.sleep(15)
 
-    # কাজ শেষ হওয়ার পর হ্যান্ডলারগুলো রিমুভ করা হচ্ছে যাতে মেমোরি ফ্রি থাকে
     tg_client.remove_event_handler(new_msg_handler)
     tg_client.remove_event_handler(edit_msg_handler)
 
-    # 'PROFILE FINDER' লোডিং মেসেজটি ডিলিট করে দেওয়া
     try:
         await status_msg.delete()
     except:
