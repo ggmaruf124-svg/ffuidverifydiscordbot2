@@ -40,7 +40,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# Setup Telegram Client via StringSession (No file generation)
+# Setup Telegram Client via StringSession
 tg_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 
@@ -49,28 +49,57 @@ async def on_ready():
     print(f"Logged in as Discord Bot: {bot.user}")
     if not tg_client.is_connected():
         await tg_client.start()
-        print("Telegram Client Connected Successfully via String Session!")
+        print("Telegram Client Connected Successfully!")
 
 
 @bot.command(name="get")
 async def get_uid(ctx, uid: str):
-    await ctx.send(f"⏳ Processing UID: `{uid}`... Fetching details from Telegram.")
+    await ctx.send(f"⏳ **Processing UID:** `{uid}`... Request sent to Telegram Bot.")
     message_to_send = f"/get {uid}"
 
     try:
-        async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=30) as conv:
+        async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=45) as conv:
+            # 1. Request single message forward clear layout
             await conv.send_message(message_to_send)
-            response = await conv.get_response()
-
-            if response.text:
-                await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
-            else:
-                await ctx.send("❌ Telegram bot raw text reply dey ni.")
+            
+            # --- LOOP FOR CAPTURING MULTIPLE RESPONSES ---
+            # TG Bot total 3-4 ti message pathabe (Text -> Main Info -> Sticker -> Photo)
+            received_main_info = False
+            
+            # Amra loop caliye porpor response check korbo
+            for i in range(5):  # Maximum 5 ti message logic fetch block
+                response = await conv.get_response()
                 
+                # Case A: Shudhu processing text message ("Fetching information...")
+                if response.text and "Fetching information" in response.text:
+                    # Eta "Fetching information..." hole amra skip/ignore korbo
+                    continue
+                
+                # Case B: Real Player Account Details Information
+                if response.text and "Account Information:" in response.text:
+                    received_main_info = True
+                    await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
+                    continue
+                
+                # Case C: Media files capture handling (Sticker data or Images summary)
+                if response.media:
+                    # Local download queue format buffer target string
+                    file_path = await tg_client.download_media(response.media)
+                    if file_path and os.path.exists(file_path):
+                        # Discord thread file pass execute call
+                        await ctx.send(file=discord.File(file_path))
+                        # Processing sheet memory remove logic
+                        os.remove(file_path)
+                    continue
+
+                # Jodi temporary text message dynamically single phase e ashe
+                if response.text and not received_main_info:
+                    await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
+
     except asyncio.TimeoutError:
-        await ctx.send("⏱️ Timeout! Telegram bot theke response paowa jayni.")
+        await ctx.send("⏱️ **Timeout!** Telegram bot target stream internal delay execution limits exceed core.")
     except Exception as e:
-        await ctx.send(f"❌ Error: {str(e)}")
+        await ctx.send(f"❌ **Error:** {str(e)}")
 
 
 async def main():
