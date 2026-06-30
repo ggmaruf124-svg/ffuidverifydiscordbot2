@@ -55,15 +55,25 @@ async def get_uid(ctx, uid: str):
     # Collected messages from TG bot (message_id -> message object)
     collected = {}
 
-    # Real-time listener: captures new messages from the TG bot
-    @tg_client.on(events.NewMessage(from_users=TARGET_BOT_USERNAME))
+    # Real-time listener: captures new messages, checks sender manually
+    @tg_client.on(events.NewMessage())
     async def on_new_message(event):
-        collected[event.message.id] = event.message
+        try:
+            sender = await event.get_sender()
+            if sender and getattr(sender, "username", "").lower() == TARGET_BOT_USERNAME.lower():
+                collected[event.message.id] = event.message
+        except Exception:
+            pass
 
     # Real-time listener: captures edited messages (e.g. "Fetching..." -> full info)
-    @tg_client.on(events.MessageEdited(from_users=TARGET_BOT_USERNAME))
+    @tg_client.on(events.MessageEdited())
     async def on_edited_message(event):
-        collected[event.message.id] = event.message
+        try:
+            sender = await event.get_sender()
+            if sender and getattr(sender, "username", "").lower() == TARGET_BOT_USERNAME.lower():
+                collected[event.message.id] = event.message
+        except Exception:
+            pass
 
     try:
         await tg_client.send_message(TARGET_BOT, f"/get {uid}")
@@ -98,9 +108,9 @@ async def on_ready():
     print(f"Discord bot logged in as {bot.user}")
 
 async def main():
-    await tg_client.start()
-    print("Telegram client started.")
-    await bot.start(DISCORD_TOKEN)
+    async with tg_client:
+        print("Telegram client started.")
+        await bot.start(DISCORD_TOKEN)
 
 if __name__ == "__main__":
     asyncio.run(main())
