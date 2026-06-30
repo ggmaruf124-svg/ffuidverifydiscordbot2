@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 import nest_asyncio
 from flask import Flask
-from telethon import TelegramClient, events
+from telethon import TelegramClient
 
 # Nest asyncio configuration
 nest_asyncio.apply()
@@ -28,11 +28,11 @@ API_ID = 33809887
 API_HASH = "6d1b4c3acabca19425298ec275b0b469"
 TARGET_TELEGRAM_BOT = "@FFPlayerInfoBot"
 
-# String session configuration
+# String session load
 STRING_SESSION = os.environ.get("TELEGRAM_STRING_SESSION", "")
 
 if not STRING_SESSION:
-    raise ValueError("ERROR: TELEGRAM_STRING_SESSION is missing in Render variables!")
+    raise ValueError("ERROR: TELEGRAM_STRING_SESSION is missing in Render environment variables!")
 
 # Setup Discord Bot
 intents = discord.Intents.default()
@@ -43,30 +43,6 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 from telethon.sessions import StringSession
 tg_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
-# Active active tracking session management dictionary
-active_requests = {}
-
-
-# --- Telegram Message Listener Event ---
-@tg_client.on(events.NewMessage(chats=TARGET_TELEGRAM_BOT))
-async def handle_telegram_response(event):
-    # Jodi text processing layout code runtime validation checks
-    if event.text and "Fetching information" in event.text:
-        return  # Completely ignore this initial spam message
-        
-    # Find active context to forward the text details or media
-    for discord_ctx in list(active_requests.keys()):
-        # 1. Profile Core text metadata forward
-        if event.text and "Account Information:" in event.text:
-            await discord_ctx.send(f"📢 **Telegram Bot Response:**\n\n{event.text}")
-            
-        # 2. Files forward handle (Sticker, Outfits Photo)
-        elif event.media:
-            file_path = await tg_client.download_media(event.media)
-            if file_path and os.path.exists(file_path):
-                await discord_ctx.send(file=discord.File(file_path))
-                os.remove(file_path)
-
 
 @bot.event
 async def on_ready():
@@ -76,29 +52,42 @@ async def on_ready():
         print("Telegram Client Connected Successfully!")
 
 
-# --- Discord Command Setup ---
+# --- Discord Command Block ---
 @bot.command(name="get")
 async def get_uid(ctx, uid: str):
-    await ctx.send(f"⏳ **Processing UID:** `{uid}`... Fetching dynamic profile asset package.")
+    await ctx.send(f"⏳ **Processing UID:** `{uid}`... Requesting Telegram Bot asset pipeline.")
     message_to_send = f"/get {uid}"
 
-    # Target stream listener channel registry load
-    active_requests[ctx] = True
-
     try:
-        # Request trigger koro telegram bot-er inbox-e
+        # 1. Telegram bot inbox e dynamic message text execute command push koro
         await tg_client.send_message(TARGET_TELEGRAM_BOT, message_to_send)
         
-        # Max loop window runtime context processing hold 15 seconds
-        # Jate data safely stream hobar por queue table clear hoy
-        await asyncio.sleep(15)
+        # 2. TG bot processing executing target timeframe break context (5 second block wait)
+        await asyncio.sleep(5)
         
+        # 3. Last 4 message dump dynamic validation processing queue collect koro
+        messages = await tg_client.get_messages(TARGET_TELEGRAM_BOT, limit=4)
+        
+        # Messages reverse direct read hobe jate chronological order order active thake
+        for msg in reversed(messages):
+            # A. Ignoring runtime standard notice stream lines
+            if msg.text and "Fetching information" in msg.text:
+                continue
+                
+            # B. Processing player data summary text card layout
+            if msg.text and "Account Information:" in msg.text:
+                await ctx.send(f"📢 **Telegram Bot Response:**\n\n{msg.text}")
+                continue
+                
+            # C. Processing active visual media streams (Stickers and Image Summary assets)
+            if msg.media:
+                file_path = await tg_client.download_media(msg.media)
+                if file_path and os.path.exists(file_path):
+                    await ctx.send(file=discord.File(file_path))
+                    os.remove(file_path) # Storage layer safe wipe
+                    
     except Exception as e:
         await ctx.send(f"❌ **Error:** {str(e)}")
-    finally:
-        # Context cleanup registration table remove mapping
-        if ctx in active_requests:
-            del active_requests[ctx]
 
 
 async def main():
