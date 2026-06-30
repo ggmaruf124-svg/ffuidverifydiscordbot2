@@ -29,7 +29,7 @@ API_ID = 33809887
 API_HASH = "6d1b4c3acabca19425298ec275b0b469"
 TARGET_TELEGRAM_BOT = "@FFPlayerInfoBot"
 
-# Environment variables theke session token pull korbe
+# Environment variables matching
 STRING_SESSION = os.environ.get("TELEGRAM_STRING_SESSION", "")
 
 if not STRING_SESSION:
@@ -58,46 +58,45 @@ async def get_uid(ctx, uid: str):
     message_to_send = f"/get {uid}"
 
     try:
-        async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=45) as conv:
-            # 1. Request single message forward clear layout
+        async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=60) as conv:
             await conv.send_message(message_to_send)
             
-            # --- LOOP FOR CAPTURING MULTIPLE RESPONSES ---
-            # TG Bot total 3-4 ti message pathabe (Text -> Main Info -> Sticker -> Photo)
-            received_main_info = False
+            # Count track korbo total koyta relevant content pelam
+            # Target holo: 1ta Text info message, 1ta Sticker, 1ta Outfit Photo
+            media_count = 0
             
-            # Amra loop caliye porpor response check korbo
-            for i in range(5):  # Maximum 5 ti message logic fetch block
-                response = await conv.get_response()
-                
-                # Case A: Shudhu processing text message ("Fetching information...")
-                if response.text and "Fetching information" in response.text:
-                    # Eta "Fetching information..." hole amra skip/ignore korbo
-                    continue
-                
-                # Case B: Real Player Account Details Information
-                if response.text and "Account Information:" in response.text:
-                    received_main_info = True
-                    await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
-                    continue
-                
-                # Case C: Media files capture handling (Sticker data or Images summary)
-                if response.media:
-                    # Local download queue format buffer target string
-                    file_path = await tg_client.download_media(response.media)
-                    if file_path and os.path.exists(file_path):
-                        # Discord thread file pass execute call
-                        await ctx.send(file=discord.File(file_path))
-                        # Processing sheet memory remove logic
-                        os.remove(file_path)
-                    continue
+            while True:
+                try:
+                    # Message ektar por ekta ashar jonno chotto 12 second individual waiting layer
+                    response = await asyncio.wait_for(conv.get_response(), timeout=12)
+                    
+                    # 1. Skip processing text message ("Fetching information...")
+                    if response.text and "Fetching information" in response.text:
+                        continue
+                    
+                    # 2. Main Account Profile Details Card Text
+                    if response.text and "Account Information:" in response.text:
+                        await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
+                        continue
+                    
+                    # 3. Handle Media Assets (Stickers + Images)
+                    if response.media:
+                        # Temporary local file save layer
+                        file_path = await tg_client.download_media(response.media)
+                        if file_path and os.path.exists(file_path):
+                            await ctx.send(file=discord.File(file_path))
+                            os.remove(file_path) # Storage clean
+                            media_count += 1
+                            
+                        # Jodi text message ashar por already targeted media (sticker o photo) asha complete hoye jay, loop end korbo
+                        if media_count >= 2:
+                            break
+                        continue
+                        
+                except asyncio.TimeoutError:
+                    # Individual message asha theme gele nirgup break korbe, kono error string dekhabe na
+                    break
 
-                # Jodi temporary text message dynamically single phase e ashe
-                if response.text and not received_main_info:
-                    await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
-
-    except asyncio.TimeoutError:
-        await ctx.send("⏱️ **Timeout!** Telegram bot target stream internal delay execution limits exceed core.")
     except Exception as e:
         await ctx.send(f"❌ **Error:** {str(e)}")
 
