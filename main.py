@@ -1,102 +1,89 @@
-import os
 import asyncio
-import threading
+import os
+from threading import Thread
 import discord
 from discord.ext import commands
-from telethon import TelegramClient
+ import nest_asyncio
 from flask import Flask
+from telethon import TelegramClient
 
-# ================= FLASK SERVER FOR RENDER =================
+# Nest asyncio config for conflict prevention
+nest_asyncio.apply()
+
+# --- Flask Server Setup (For Render Web Service) ---
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def home():
-    return "Bot is running perfectly!"
+    return "Bot is alive and running!"
+
 
 def run_flask():
-    port = int(os.getenv("PORT", 8000))
+    # Render automatic 'PORT' environment variable pass kore, default 5000
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= CONFIGURATION =================
-TELEGRAM_API_ID = 33809887          
-TELEGRAM_API_HASH = "6d1b4c3acabca19425298ec275b0b469"
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-TARGET_BOT = 'FFPlayerInfoBot' 
-# =================================================
 
-bot = commands.Bot(command_prefix="/", intents=discord.Intents.all())
-tg_client = TelegramClient('my_account', TELEGRAM_API_ID, TELEGRAM_API_HASH)
+# --- Bot & Telegram Configuration ---
+# Config gulo uporei thaklo, tumi chai le ekhane string o bosaite paro
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_DISCORD_BOT_TOKEN_HERE")
+API_ID = 33809887
+API_HASH = "6d1b4c3acabca19425298ec275b0b469"
+TARGET_TELEGRAM_BOT = "@FFPlayerInfoBot"
+
+# Discord Bot Setup
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="/", intents=intents)
+
+# Telegram Client Setup
+tg_client = TelegramClient("session_name", API_ID, API_HASH)
+
 
 @bot.event
 async def on_ready():
-    print(f"✅ Discord Bot is online as {bot.user}")
+    print(f"Logged in as Discord Bot: {bot.user}")
     if not tg_client.is_connected():
-        await tg_client.connect()
-    if await tg_client.is_user_authorized():
-        print("✅ Telegram Account Session loaded successfully!")
-    else:
-        print("❌ ERROR: Session invalid!")
+        await tg_client.start()
+        print("Telegram Client Connected Successfully!")
 
-@bot.command()
-async def uid(ctx, uid_number: str):
-    status_msg = await ctx.send(f"🔍 | **PROFILE FINDER** | {ctx.author.mention}, ফ্রিফায়ার UID: `{uid_number}` এর ফুল প্রোফাইল ও মিডিয়া টেলিগ্রাম থেকে আনা হচ্ছে...")
-    
-    if not tg_client.is_connected():
-        await tg_client.connect()
 
-    # ১. টেলিগ্রাম বটের কাছে রিকোয়েস্ট পাঠানো
-    await tg_client.send_message(TARGET_BOT, f'/get {uid_number}')
-    
-    # ফ্রিফায়ার বটটি যেন ডাটা জেনারেট করার সময় পায় সেজন্য ৫ সেকেন্ড অপেক্ষা
-    await asyncio.sleep(5)
+@bot.command(name="get")
+async def get_uid(ctx, uid: str):
+    await ctx.send(
+        f"⏳ Processing UID: `{uid}`... Fetching details from Telegram."
+    )
+    message_to_send = f"/get {uid}"
 
-    # ২. সরাসরি চ্যাট হিস্ট্রি থেকে শেষ ৫টি মেসেজ টেনে আনা (কোনো ইভেন্ট লিসেনার লাগবে না)
-    messages_to_forward = []
-    async for message in tg_client.iter_messages(TARGET_BOT, limit=5):
-        msg_text = message.text or ""
-        
-        # 'Fetching information' মেসেজটি বাদ দেওয়া
-        if "Fetching information for" in msg_text:
-            continue
-            
-        messages_to_forward.append(message)
-
-    # মেসেজগুলো যেহেতু উল্টো ক্রমানুসারে আসে (নতুন থেকে পুরোনো), তাই এটাকে সোজা করে নেওয়া
-    messages_to_forward.reverse()
-
-    # ৩. ডিসকর্ডে ফরওয়ার্ড করা শুরু
-    if not messages_to_forward:
-        await ctx.send("⚠️ টেলিগ্রাম বট থেকে কোনো রেসপন্স পাওয়া যায়নি! ফ্রিফায়ার বটটি হয়তো ডাউন আছে।")
-    else:
-        for msg in messages_to_forward:
-            # টেক্সট ডাটা পাঠানো
-            if msg.text and "Account Information:" in msg.text:
-                await ctx.send(f"```text\n{msg.text}\n```")
-                await asyncio.sleep(1)
-                
-            # স্টিকার বা ফটো পাঠানো
-            elif msg.media:
-                try:
-                    file_path = await tg_client.download_media(msg)
-                    if file_path and os.path.exists(file_path):
-                        await ctx.send(file=discord.File(file_path))
-                        await asyncio.sleep(1)
-                        os.remove(file_path)
-                except Exception as e:
-                    print(f"Media forward error: {e}")
-
-    # ডিসকর্ডের লোডিং স্ট্যাটাস মেসেজটি ডিলিট করা
     try:
-        await status_msg.delete()
-    except:
-        pass
+        async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=30) as conv:
+            await conv.send_message(message_to_send)
+            response = await conv.get_response()
+
+            if response.text:
+                await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
+            else:
+                await ctx.send("❌ Telegram bot raw text reply dey ni.")
+    except asyncio.TimeoutError:
+        await ctx.send("⏱️ Timeout! Telegram bot theke response paowa jayni.")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+
+async def main():
+    # Background thread-e Flask server chalano
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Discord & Telethon run kora
+    async with tg_client:
+        await bot.start(DISCORD_TOKEN)
+
 
 if __name__ == "__main__":
-    if not DISCORD_TOKEN:
-        print("Error: DISCORD_TOKEN missing!")
-    else:
-        flask_thread = threading.Thread(target=run_flask)
-        flask_thread.daemon = True
-        flask_thread.start()
-        
-        bot.run(DISCORD_TOKEN)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped.")
