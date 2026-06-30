@@ -3,7 +3,7 @@ import os
 from threading import Thread
 import discord
 from discord.ext import commands
- import nest_asyncio
+import nest_asyncio  # <--- Ekhon bamer extra space-ta thik kora hoyeche
 from flask import Flask
 from telethon import TelegramClient
 
@@ -20,13 +20,11 @@ def home():
 
 
 def run_flask():
-    # Render automatic 'PORT' environment variable pass kore, default 5000
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
 
 # --- Bot & Telegram Configuration ---
-# Config gulo uporei thaklo, tumi chai le ekhane string o bosaite paro
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_DISCORD_BOT_TOKEN_HERE")
 API_ID = 33809887
 API_HASH = "6d1b4c3acabca19425298ec275b0b469"
@@ -72,12 +70,10 @@ async def get_uid(ctx, uid: str):
 
 
 async def main():
-    # Background thread-e Flask server chalano
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Discord & Telethon run kora
     async with tg_client:
         await bot.start(DISCORD_TOKEN)
 
