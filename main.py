@@ -7,7 +7,7 @@ nest_asyncio.apply()
 
 import discord
 from discord.ext import commands
-from telethon import TelegramClient
+from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
 
@@ -37,6 +37,7 @@ if not TELEGRAM_STRING_SESSION:
 API_ID = 33809887
 API_HASH = "6d1b4c3acabca19425298ec275b0b469"
 TARGET_BOT = "@FFPlayerInfoBot"
+TARGET_BOT_USERNAME = "FFPlayerInfoBot"
 
 # --- Telegram client ---
 tg_client = TelegramClient(StringSession(TELEGRAM_STRING_SESSION), API_ID, API_HASH)
@@ -51,25 +52,39 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 async def get_uid(ctx, uid: str):
     await ctx.send(f"⏳ **Processing UID:** `{uid}`... Requesting Telegram Bot asset pipeline.")
 
-    await tg_client.send_message(TARGET_BOT, f"/get {uid}")
-    await asyncio.sleep(12)
+    # Collected messages from TG bot (message_id -> message object)
+    collected = {}
+
+    # Real-time listener: captures new messages from the TG bot
+    @tg_client.on(events.NewMessage(from_users=TARGET_BOT_USERNAME))
+    async def on_new_message(event):
+        collected[event.message.id] = event.message
+
+    # Real-time listener: captures edited messages (e.g. "Fetching..." -> full info)
+    @tg_client.on(events.MessageEdited(from_users=TARGET_BOT_USERNAME))
+    async def on_edited_message(event):
+        collected[event.message.id] = event.message
 
     try:
-        messages = await tg_client.get_messages(TARGET_BOT, limit=10)
-    except Exception:
+        await tg_client.send_message(TARGET_BOT, f"/get {uid}")
+
+        # Wait 12 seconds for the TG bot to finish sending everything
+        await asyncio.sleep(12)
+
+    finally:
+        tg_client.remove_event_handler(on_new_message)
+        tg_client.remove_event_handler(on_edited_message)
+
+    if not collected:
+        await ctx.send("⚠️ No response received from Telegram bot.")
         return
 
-    for msg in reversed(messages):
+    # Send all collected messages to Discord in chronological order (oldest first)
+    for msg in sorted(collected.values(), key=lambda m: m.id):
         try:
-            # Skip messages we sent ourselves
-            if msg.out:
-                continue
-
-            # Send text if present
             if msg.text and msg.text.strip():
                 await ctx.send(f"📢 **Telegram Bot Response:**\n\n{msg.text}")
 
-            # Send media if present
             if msg.media:
                 file_path = await tg_client.download_media(msg.media)
                 if file_path:
