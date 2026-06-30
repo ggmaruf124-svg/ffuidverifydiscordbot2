@@ -52,10 +52,10 @@ async def get_uid(ctx, uid: str):
     await ctx.send(f"⏳ **Processing UID:** `{uid}`... Requesting Telegram Bot asset pipeline.")
 
     await tg_client.send_message(TARGET_BOT, f"/get {uid}")
-    await asyncio.sleep(5)
+    await asyncio.sleep(12)
 
     try:
-        messages = await tg_client.get_messages(TARGET_BOT, limit=4)
+        messages = await tg_client.get_messages(TARGET_BOT, limit=10)
     except Exception:
         return
 
@@ -65,15 +65,11 @@ async def get_uid(ctx, uid: str):
             if msg.out:
                 continue
 
-            # Skip the "Fetching information" loading message
-            if msg.text and "Fetching information" in msg.text:
-                continue
-
             # Send text if present
             if msg.text and msg.text.strip():
                 await ctx.send(f"📢 **Telegram Bot Response:**\n\n{msg.text}")
 
-            # Send media if present (independent of text — handles images and stickers)
+            # Send media if present
             if msg.media:
                 file_path = await tg_client.download_media(msg.media)
                 if file_path:
