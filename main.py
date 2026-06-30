@@ -1,9 +1,22 @@
+# --- Python 3.13/3.14 Compatibility Hack ---
+import sys
+try:
+    import audioop
+except ModuleNotFoundError:
+    try:
+        import audioop_lts as audioop
+        sys.modules['audioop'] = audioop
+        print("Successfully patched audioop for Python 3.14+")
+    except ModuleNotFoundError:
+        print("Warning: audioop-lts package is missing from requirements.txt")
+# -------------------------------------------
+
 import asyncio
 import os
 from threading import Thread
 import discord
 from discord.ext import commands
-import nest_asyncio  # <--- Ekhon bamer extra space-ta thik kora hoyeche
+import nest_asyncio
 from flask import Flask
 from telethon import TelegramClient
 
@@ -13,15 +26,14 @@ nest_asyncio.apply()
 # --- Flask Server Setup (For Render Web Service) ---
 app = Flask(__name__)
 
-
-@app.route("/")
+@app.route('/')
 def home():
     return "Bot is alive and running!"
 
-
 def run_flask():
+    # Render automatic 'PORT' environment variable pass kore, default 5000
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=port)
 
 
 # --- Bot & Telegram Configuration ---
@@ -49,12 +61,12 @@ async def on_ready():
 
 @bot.command(name="get")
 async def get_uid(ctx, uid: str):
-    await ctx.send(
-        f"⏳ Processing UID: `{uid}`... Fetching details from Telegram."
-    )
+    """Usage: /get 12345678"""
+    await ctx.send(f"⏳ Processing UID: `{uid}`... Fetching details from Telegram.")
     message_to_send = f"/get {uid}"
 
     try:
+        # Telegram conversation pattern handling
         async with tg_client.conversation(TARGET_TELEGRAM_BOT, timeout=30) as conv:
             await conv.send_message(message_to_send)
             response = await conv.get_response()
@@ -62,7 +74,8 @@ async def get_uid(ctx, uid: str):
             if response.text:
                 await ctx.send(f"📢 **Telegram Bot Response:**\n\n{response.text}")
             else:
-                await ctx.send("❌ Telegram bot raw text reply dey ni.")
+                await ctx.send("❌ Telegram bot raw text reply dey ni (hoito template embed/button/media chilo).")
+                
     except asyncio.TimeoutError:
         await ctx.send("⏱️ Timeout! Telegram bot theke response paowa jayni.")
     except Exception as e:
@@ -70,10 +83,12 @@ async def get_uid(ctx, uid: str):
 
 
 async def main():
+    # Flask app concurrent active thread running logic
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
+    # Discord & Telethon combined startup runtime loop
     async with tg_client:
         await bot.start(DISCORD_TOKEN)
 
@@ -82,4 +97,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Bot stopped.")
+        print("Bot stopped manually.")
