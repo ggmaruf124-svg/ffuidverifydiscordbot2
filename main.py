@@ -61,15 +61,19 @@ async def get_uid(ctx, uid: str):
 
     for msg in reversed(messages):
         try:
-            # Skip noise messages entirely
+            # Skip messages we sent ourselves
+            if msg.out:
+                continue
+
+            # Skip the "Fetching information" loading message
             if msg.text and "Fetching information" in msg.text:
                 continue
 
-            # Send text first (if any meaningful text exists)
+            # Send text if present
             if msg.text and msg.text.strip():
                 await ctx.send(f"📢 **Telegram Bot Response:**\n\n{msg.text}")
 
-            # Then send media (if any) — independent of text check
+            # Send media if present (independent of text — handles images and stickers)
             if msg.media:
                 file_path = await tg_client.download_media(msg.media)
                 if file_path:
