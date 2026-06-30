@@ -6,6 +6,7 @@ from discord.ext import commands
 import nest_asyncio
 from flask import Flask
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 # Nest asyncio configuration
 nest_asyncio.apply()
@@ -15,29 +16,32 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is alive and running safely!"
+    return "Bot is alive and running safely via StringSession!"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 
 # --- Configurations ---
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_DISCORD_BOT_TOKEN_HERE")
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "YOUR_DISCORD_BOT_TOKEN")
 API_ID = 33809887
 API_HASH = "6d1b4c3acabca19425298ec275b0b469"
 TARGET_TELEGRAM_BOT = "@FFPlayerInfoBot"
+
+# Environment variables theke session token pull korbe
+STRING_SESSION = os.environ.get("TELEGRAM_STRING_SESSION", "")
+
+if not STRING_SESSION:
+    raise ValueError("ERROR: TELEGRAM_STRING_SESSION is missing in Render environment variables!")
 
 # Setup Discord Bot
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# ==========================================
-# CHANGE: "session_name" k "render_session_v2" kora holo
-# jate corrupted database block drop hoye fresh run hoy
-# ==========================================
-tg_client = TelegramClient("render_session_v2", API_ID, API_HASH)
+# Setup Telegram Client via StringSession (No file generation)
+tg_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 
 @bot.event
@@ -45,7 +49,7 @@ async def on_ready():
     print(f"Logged in as Discord Bot: {bot.user}")
     if not tg_client.is_connected():
         await tg_client.start()
-        print("Telegram Client Connected Successfully!")
+        print("Telegram Client Connected Successfully via String Session!")
 
 
 @bot.command(name="get")
