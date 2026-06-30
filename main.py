@@ -33,8 +33,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# Setup Telegram Client
-tg_client = TelegramClient("session_name", API_ID, API_HASH)
+# ==========================================
+# CHANGE: "session_name" k "render_session_v2" kora holo
+# jate corrupted database block drop hoye fresh run hoy
+# ==========================================
+tg_client = TelegramClient("render_session_v2", API_ID, API_HASH)
 
 
 @bot.event
